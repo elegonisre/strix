@@ -15,7 +15,7 @@
 
 <a href="https://docs.strix.ai"><img src="https://img.shields.io/badge/Docs-docs.strix.ai-2b9246?style=for-the-badge&logo=gitbook&logoColor=white" alt="Docs"></a>
 <a href="https://strix.ai"><img src="https://img.shields.io/badge/Website-strix.ai-f0f0f0?style=for-the-badge&logoColor=000000" alt="Website"></a>
-[![](https://dcbadge.limes.pink/api/server/8Suzzd9z)](https://discord.gg/strix-ai)
+[![](https://dcbadge.limes.pink/api/server/strix-ai)](https://discord.gg/strix-ai)
 
 <a href="https://deepwiki.com/usestrix/strix"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 <a href="https://github.com/usestrix/strix"><img src="https://img.shields.io/github/stars/usestrix/strix?style=flat-square" alt="GitHub Stars"></a>
@@ -30,6 +30,7 @@
 <a href="https://trendshift.io/repositories/15362" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15362" alt="usestrix/strix | Trendshift" width="250" height="55"/></a>
 
 </div>
+
 
 
 > [!TIP]
@@ -72,7 +73,9 @@ Strix are autonomous AI agents that act just like real hackers - they run your c
 
 **Prerequisites:**
 - Docker (running)
-- An LLM provider key (e.g. [get OpenAI API key](https://platform.openai.com/api-keys) or use a local LLM)
+- An LLM API key:
+  - Any [supported provider](https://docs.strix.ai/llm-providers/overview) (OpenAI, Anthropic, Google, etc.)
+  - Or [Strix Router](https://models.strix.ai) — single API key for multiple providers
 
 ### Installation & First Scan
 
@@ -80,11 +83,8 @@ Strix are autonomous AI agents that act just like real hackers - they run your c
 # Install Strix
 curl -sSL https://strix.ai/install | bash
 
-# Or via pipx
-pipx install strix-agent
-
 # Configure your AI provider
-export STRIX_LLM="openai/gpt-5"
+export STRIX_LLM="openai/gpt-5"  # or "strix/gpt-5" via Strix Router (https://models.strix.ai)
 export LLM_API_KEY="your-api-key"
 
 # Run your first security assessment
@@ -93,6 +93,20 @@ strix --target ./app-directory
 
 > [!NOTE]
 > First run automatically pulls the sandbox Docker image. Results are saved to `strix_runs/<run-name>`
+
+---
+
+## ☁️ Strix Platform
+
+Try the Strix full-stack security platform at **[app.strix.ai](https://app.strix.ai)** — sign up for free, connect your repos and domains, and launch a pentest in minutes.
+
+- **Validated findings with PoCs** and reproduction steps
+- **One-click autofix** as ready-to-merge pull requests
+- **Continuous monitoring** across code, cloud, and infrastructure
+- **Integrations** with GitHub, Slack, Jira, Linear, and CI/CD pipelines
+- **Continuous learning** that builds on past findings and remediations
+
+[**Start your first pentest →**](https://app.strix.ai)
 
 ---
 
@@ -229,10 +243,14 @@ export STRIX_REASONING_EFFORT="high"  # control thinking effort (default: high, 
 **Recommended models for best results:**
 
 - [OpenAI GPT-5](https://openai.com/api/) — `openai/gpt-5`
-- [Anthropic Claude Sonnet 4.5](https://claude.com/platform/api) — `anthropic/claude-sonnet-4-5`
+- [Anthropic Claude Sonnet 4.6](https://claude.com/platform/api) — `anthropic/claude-sonnet-4-6`
 - [Google Gemini 3 Pro Preview](https://cloud.google.com/vertex-ai) — `vertex_ai/gemini-3-pro-preview`
 
 See the [LLM Providers documentation](https://docs.strix.ai/llm-providers/overview) for all supported providers including Vertex AI, Bedrock, Azure, and local models.
+
+## Enterprise
+
+Get the same Strix experience with [enterprise-grade](https://strix.ai/demo) controls: SSO (SAML/OIDC), custom compliance reports, dedicated support & SLA, custom deployment options (VPC/self-hosted), BYOK model support, and tailored agents optimized for your environment. [Learn more](https://strix.ai/demo).
 
 ## Documentation
 

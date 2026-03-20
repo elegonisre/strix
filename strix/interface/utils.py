@@ -392,6 +392,12 @@ def build_tui_stats_text(tracer: Any, agent_config: dict[str, Any] | None = None
         stats_text.append(" · ", style="white")
         stats_text.append(f"${total_stats['cost']:.2f}", style="white")
 
+    caido_url = getattr(tracer, "caido_url", None)
+    if caido_url:
+        stats_text.append("\n")
+        stats_text.append("Caido: ", style="bold white")
+        stats_text.append(caido_url, style="white")
+
     return stats_text
 
 

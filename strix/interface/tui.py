@@ -687,7 +687,7 @@ class StrixTUIApp(App):  # type: ignore[misc]
     CSS_PATH = "assets/tui_styles.tcss"
     ALLOW_SELECT = True
 
-    SIDEBAR_MIN_WIDTH = 140
+    SIDEBAR_MIN_WIDTH = 120
 
     selected_agent_id: reactive[str | None] = reactive(default=None)
     show_splash: reactive[bool] = reactive(default=True)
@@ -749,7 +749,9 @@ class StrixTUIApp(App):  # type: ignore[misc]
     def _build_agent_config(self, args: argparse.Namespace) -> dict[str, Any]:
         scan_mode = getattr(args, "scan_mode", "deep")
         llm_config = LLMConfig(
-            scan_mode=scan_mode, is_whitebox=bool(getattr(args, "local_sources", []))
+            scan_mode=scan_mode,
+            interactive=True,
+            is_whitebox=bool(getattr(args, "local_sources", [])),
         )
 
         config = {
@@ -832,11 +834,11 @@ class StrixTUIApp(App):  # type: ignore[misc]
             agents_tree.guide_style = "dashed"
 
             stats_display = Static("", id="stats_display")
-            stats_display.ALLOW_SELECT = False
+            stats_scroll = VerticalScroll(stats_display, id="stats_scroll")
 
             vulnerabilities_panel = VulnerabilitiesPanel(id="vulnerabilities_panel")
 
-            sidebar = Vertical(agents_tree, vulnerabilities_panel, stats_display, id="sidebar")
+            sidebar = Vertical(agents_tree, vulnerabilities_panel, stats_scroll, id="sidebar")
 
             content_container.mount(chat_area_container)
             content_container.mount(sidebar)
@@ -1275,6 +1277,9 @@ class StrixTUIApp(App):  # type: ignore[misc]
         if not self._is_widget_safe(stats_display):
             return
 
+        if self.screen.selections:
+            return
+
         stats_content = Text()
 
         stats_text = build_tui_stats_text(self.tracer, self.agent_config)
@@ -1284,15 +1289,7 @@ class StrixTUIApp(App):  # type: ignore[misc]
         version = get_package_version()
         stats_content.append(f"\nv{version}", style="white")
 
-        from rich.panel import Panel
-
-        stats_panel = Panel(
-            stats_content,
-            border_style="#333333",
-            padding=(0, 1),
-        )
-
-        self._safe_widget_operation(stats_display.update, stats_panel)
+        self._safe_widget_operation(stats_display.update, stats_content)
 
     def _update_vulnerabilities_panel(self) -> None:
         """Update the vulnerabilities panel with current vulnerability data."""

@@ -14,6 +14,7 @@ from strix.llm.memory_compressor import MemoryCompressor
 from strix.llm.utils import (
     _truncate_to_first_function,
     fix_incomplete_tool_call,
+    normalize_tool_format,
     parse_tool_invocations,
 )
 from strix.skills import load_skills
@@ -62,8 +63,9 @@ class LLM:
         self.config = config
         self.agent_name = agent_name
         self.agent_id: str | None = None
+        self._active_skills: list[str] = list(config.skills or [])
         self._total_stats = RequestStats()
-        self.memory_compressor = MemoryCompressor(model_name=config.model_name)
+        self.memory_compressor = MemoryCompressor(model_name=config.litellm_model)
         self.system_prompt = self._load_system_prompt(agent_name)
 
         reasoning = Config.get("strix_reasoning_effort")
@@ -86,23 +88,51 @@ class LLM:
                 autoescape=select_autoescape(enabled_extensions=(), default_for_string=False),
             )
 
-            skills_to_load = [
-                *list(self.config.skills or []),
-                f"scan_modes/{self.config.scan_mode}",
-            ]
-            if self.config.is_whitebox:
-                skills_to_load.append("coordination/source_aware_whitebox")
+            skills_to_load = self._get_skills_to_load()
             skill_content = load_skills(skills_to_load)
             env.globals["get_skill"] = lambda name: skill_content.get(name, "")
 
             result = env.get_template("system_prompt.jinja").render(
                 get_tools_prompt=get_tools_prompt,
                 loaded_skill_names=list(skill_content.keys()),
+                interactive=self.config.interactive,
                 **skill_content,
             )
             return str(result)
         except Exception:  # noqa: BLE001
             return ""
+
+    def _get_skills_to_load(self) -> list[str]:
+        ordered_skills = [*self._active_skills]
+        ordered_skills.append(f"scan_modes/{self.config.scan_mode}")
+        if self.config.is_whitebox:
+            ordered_skills.append("coordination/source_aware_whitebox")
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for skill_name in ordered_skills:
+            if skill_name not in seen:
+                deduped.append(skill_name)
+                seen.add(skill_name)
+
+        return deduped
+
+    def add_skills(self, skill_names: list[str]) -> list[str]:
+        added: list[str] = []
+        for skill_name in skill_names:
+            if not skill_name or skill_name in self._active_skills:
+                continue
+            self._active_skills.append(skill_name)
+            added.append(skill_name)
+
+        if not added:
+            return []
+
+        updated_prompt = self._load_system_prompt(self.agent_name)
+        if updated_prompt:
+            self.system_prompt = updated_prompt
+
+        return added
 
     def set_agent_identity(self, agent_name: str | None, agent_id: str | None) -> None:
         if agent_name:
@@ -145,10 +175,10 @@ class LLM:
             delta = self._get_chunk_content(chunk)
             if delta:
                 accumulated += delta
-                if "</function>" in accumulated:
-                    accumulated = accumulated[
-                        : accumulated.find("</function>") + len("</function>")
-                    ]
+                if "</function>" in accumulated or "</invoke>" in accumulated:
+                    end_tag = "</function>" if "</function>" in accumulated else "</invoke>"
+                    pos = accumulated.find(end_tag)
+                    accumulated = accumulated[: pos + len(end_tag)]
                     yield LLMResponse(content=accumulated)
                     done_streaming = 1
                     continue
@@ -157,6 +187,7 @@ class LLM:
         if chunks:
             self._update_usage_stats(stream_chunk_builder(chunks))
 
+        accumulated = normalize_tool_format(accumulated)
         accumulated = fix_incomplete_tool_call(_truncate_to_first_function(accumulated))
         yield LLMResponse(
             content=accumulated,
@@ -186,6 +217,9 @@ class LLM:
         conversation_history.extend(compressed)
         messages.extend(compressed)
 
+        if messages[-1].get("role") == "assistant" and not self.config.interactive:
+            messages.append({"role": "user", "content": "<meta>Continue the task.</meta>"})
+
         if self._is_anthropic() and self.config.enable_prompt_caching:
             messages = self._add_cache_control(messages)
 
@@ -196,21 +230,16 @@ class LLM:
             messages = self._strip_images(messages)
 
         args: dict[str, Any] = {
-            "model": self.config.model_name,
+            "model": self.config.litellm_model,
             "messages": messages,
             "timeout": self.config.timeout,
             "stream_options": {"include_usage": True},
         }
 
-        if api_key := Config.get("llm_api_key"):
-            args["api_key"] = api_key
-        if api_base := (
-            Config.get("llm_api_base")
-            or Config.get("openai_api_base")
-            or Config.get("litellm_base_url")
-            or Config.get("ollama_api_base")
-        ):
-            args["api_base"] = api_base
+        if self.config.api_key:
+            args["api_key"] = self.config.api_key
+        if self.config.api_base:
+            args["api_base"] = self.config.api_base
         if self._supports_reasoning():
             args["reasoning_effort"] = self._reasoning_effort
 
@@ -236,8 +265,8 @@ class LLM:
     def _update_usage_stats(self, response: Any) -> None:
         try:
             if hasattr(response, "usage") and response.usage:
-                input_tokens = getattr(response.usage, "prompt_tokens", 0)
-                output_tokens = getattr(response.usage, "completion_tokens", 0)
+                input_tokens = getattr(response.usage, "prompt_tokens", 0) or 0
+                output_tokens = getattr(response.usage, "completion_tokens", 0) or 0
 
                 cached_tokens = 0
                 if hasattr(response.usage, "prompt_tokens_details"):
@@ -245,14 +274,11 @@ class LLM:
                     if hasattr(prompt_details, "cached_tokens"):
                         cached_tokens = prompt_details.cached_tokens or 0
 
+                cost = self._extract_cost(response)
             else:
                 input_tokens = 0
                 output_tokens = 0
                 cached_tokens = 0
-
-            try:
-                cost = completion_cost(response) or 0.0
-            except Exception:  # noqa: BLE001
                 cost = 0.0
 
             self._total_stats.input_tokens += input_tokens
@@ -262,6 +288,18 @@ class LLM:
 
         except Exception:  # noqa: BLE001, S110  # nosec B110
             pass
+
+    def _extract_cost(self, response: Any) -> float:
+        if hasattr(response, "usage") and response.usage:
+            direct_cost = getattr(response.usage, "cost", None)
+            if direct_cost is not None:
+                return float(direct_cost)
+        try:
+            if hasattr(response, "_hidden_params"):
+                response._hidden_params.pop("custom_llm_provider", None)
+            return completion_cost(response, model=self.config.canonical_model) or 0.0
+        except Exception:  # noqa: BLE001
+            return 0.0
 
     def _should_retry(self, e: Exception) -> bool:
         code = getattr(e, "status_code", None) or getattr(
@@ -282,13 +320,13 @@ class LLM:
 
     def _supports_vision(self) -> bool:
         try:
-            return bool(supports_vision(model=self.config.model_name))
+            return bool(supports_vision(model=self.config.canonical_model))
         except Exception:  # noqa: BLE001
             return False
 
     def _supports_reasoning(self) -> bool:
         try:
-            return bool(supports_reasoning(model=self.config.model_name))
+            return bool(supports_reasoning(model=self.config.canonical_model))
         except Exception:  # noqa: BLE001
             return False
 
@@ -309,7 +347,7 @@ class LLM:
         return result
 
     def _add_cache_control(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if not messages or not supports_prompt_caching(self.config.model_name):
+        if not messages or not supports_prompt_caching(self.config.canonical_model):
             return messages
 
         result = list(messages)
