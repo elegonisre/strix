@@ -34,7 +34,7 @@ Thank you for your interest in contributing to Strix! This guide will help you g
    export LLM_API_KEY="your-api-key"
    ```
 
-   > **Personal note:** I've been using `anthropic/claude-opus-4-5` locally and it works well for skill development/testing.
+   > **Personal note:** I've been using `anthropic/claude-opus-4-5` locally and it works well for skill development/testing. Also tried `openai/gpt-4o` which is noticeably faster for quick iteration cycles.
 
 4. **Run Strix in development mode**
    ```bash
@@ -110,9 +110,3 @@ We welcome feature ideas! Please:
 
 We value all contributions! Contributors will be:
 - Listed in release notes
-- Thanked in our Discord
-- Added to contributors list (coming soon)
-
----
-
-**Questions?** Reach out on [Discord](https://discord.gg/strix-ai)
