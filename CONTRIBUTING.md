@@ -37,6 +37,13 @@ Thank you for your interest in contributing to Strix! This guide will help you g
    > **Personal note:** I've been using `anthropic/claude-opus-4-5` locally and it works well for skill development/testing. Also tried `openai/gpt-4o` which is noticeably faster for quick iteration cycles. For budget-conscious testing, `anthropic/claude-haiku-3-5` is surprisingly capable and much cheaper.
    >
    > I keep a `.env` file in the project root (gitignored) and load it with `source .env` — easier than re-exporting every session.
+   >
+   > My `.env` template:
+   > ```
+   > export STRIX_LLM="anthropic/claude-haiku-3-5"
+   > export LLM_API_KEY="sk-..."
+   > export STRIX_MAX_DEPTH=3
+   > ```
 
 4. **Run Strix in development mode**
    ```bash
@@ -99,10 +106,4 @@ We welcome feature ideas! Please:
 
 - Check existing issues first
 - Describe the use case clearly
-- Explain why it would benefit users
-- Consider implementation approach
-- Be open to discussion
-
-## 🤝 Community
-
-- **Discord**: [Join our community](https://disc
+- Explain why it would benefit the project
