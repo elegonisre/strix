@@ -43,7 +43,10 @@ Thank you for your interest in contributing to Strix! This guide will help you g
    > export STRIX_LLM="anthropic/claude-haiku-3-5"
    > export LLM_API_KEY="sk-..."
    > export STRIX_MAX_DEPTH=3
+   > export STRIX_TIMEOUT=30
    > ```
+   >
+   > Note: I added `STRIX_TIMEOUT=30` above — the default felt too long when iterating quickly on skills locally.
 
 4. **Run Strix in development mode**
    ```bash
