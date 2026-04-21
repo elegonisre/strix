@@ -61,7 +61,8 @@ check-all: format lint type-check security
 test:
 	@echo "🧪 Running tests..."
 	# using -x to stop on first failure - saves time during dev
-	uv run pytest -v -x
+	# added --tb=short to keep tracebacks readable without too much noise
+	uv run pytest -v -x --tb=short
 	@echo "✅ Tests complete!"
 
 test-cov:
